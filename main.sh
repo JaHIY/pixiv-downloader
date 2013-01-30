@@ -16,11 +16,13 @@ PIXIV_MANGA_IMG_REGEX='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]
 PIXIV_MANGA_IMG_SUBSTITUTE='s;^\(http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\)\(_p[[:digit:]]\+\.[[:alpha:]]\+\)$;\1_big\3;g'
 
 get_cookie() {
+    printf 'Now I am getting cookie......'
     curl -s -c "$COOKIE_FILE" -A "$USER_AGENT" -d "mode=login&pixiv_id=${ACCOUNT}&pass=${PASSWORD}&skip=1" 'http://www.pixiv.net/login.php'
+    printf 'Done!\n'
 }
 
 check_mode() {
-    curl -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | grep -F "$PIXIV_MODE_SEARCH" | sed -e "s/${PIXIV_MODE_REGEX}/\1/"
+    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | grep -F "$PIXIV_MODE_SEARCH" | sed -e "s/${PIXIV_MODE_REGEX}/\1/"
 }
 
 get_pixiv_img_id() {
@@ -41,25 +43,31 @@ download_pixiv_single_img() {
 }
 
 download_pixiv_img() {
-    echo 'download_pixiv_img() -> $1:' "$1" '$2:' "$2"
+    #echo 'download_pixiv_img() -> $1:' "$1" '$2:' "$2"
     case "$1" in
         'manga')
+            printf "Pixiv id $2 is a set of illustrations!\nI am downloading them for you......\n"
             download_pixiv_manga_imgs "$2"
+            printf "Done!\n"
         ;;
         'big')
+            printf "Pixiv id $2 is a single illustration!\nI am downloading it for you......\n"
             download_pixiv_single_img "$2"
+            printf "Done!\n"
         ;;
     esac
 }
 
 main() {
     local pixiv_img_id=''
+    printf "Hello, master. My name is pixiv-downloader-$$. I am working for you now.\n"
     get_cookie
     while read line
     do
         pixiv_img_id=$(get_pixiv_img_id "$line")
         download_pixiv_img $(check_mode "$pixiv_img_id") "$pixiv_img_id"
     done
+    printf 'My work is complete. Goodbye, master!\n'
 }
 
 main

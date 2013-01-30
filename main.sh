@@ -54,7 +54,7 @@ download_pixiv_img() {
 
 main() {
     local pixiv_img_id=''
-    #get_cookie
+    get_cookie
     while read line
     do
         pixiv_img_id=$(get_pixiv_img_id "$line")

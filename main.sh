@@ -2,7 +2,7 @@
 
 . ./config
 
-PIXIV_NUM_REGEX='^.*illust_id=\([[:digit:]]\+\).*$'
+PIXIV_IMG_ID_REGEX='^.*illust_id=\([[:digit:]]\+\).*$'
 COOKIE_FILE='cookie.txt'
 USER_AGENT='Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
@@ -24,7 +24,7 @@ check_mode() {
 }
 
 get_pixiv_img_id() {
-    sed -e "s/${PIXIV_NUM_REGEX}/\1/" <<< "$1"
+    sed -e "s/${PIXIV_IMG_ID_REGEX}/\1/" <<< "$1"
 }
 
 download_pixiv_manga_imgs() {

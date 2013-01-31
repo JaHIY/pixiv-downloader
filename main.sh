@@ -29,7 +29,7 @@ get_pixiv_img_id() {
 download_pixiv_manga_imgs() {
     local PIXIV_MANGA_IMG_REGEX='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+_p[[:digit:]]\+\.[[:alpha:]]\+'
     local PIXIV_MANGA_IMG_SUBSTITUTE='s;^\(http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\)\(_p[[:digit:]]\+\.[[:alpha:]]\+\)$;\1_big\3;g'
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | grep -o "$PIXIV_MANGA_IMG_REGEX" | sed -e "$PIXIV_MANGA_IMG_SUBSTITUTE" | xargs curl --remote-name-all -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}" "$pixiv_img_url"
+    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | grep -o "$PIXIV_MANGA_IMG_REGEX" | sed -e "$PIXIV_MANGA_IMG_SUBSTITUTE" | xargs curl --remote-name-all -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}"
 }
 
 download_pixiv_single_img() {

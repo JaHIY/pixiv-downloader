@@ -67,4 +67,4 @@ main() {
     printf 'My work is complete. Goodbye, master~\n'
 }
 
-main
+main "$@"

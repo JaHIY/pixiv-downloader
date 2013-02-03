@@ -20,7 +20,8 @@ check_mode() {
     local pixiv_mode_search='class="works_display"'
     local pixiv_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\+\).*$'
     curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | \
-        grep -F "$pixiv_mode_search" | sed -e "s/${pixiv_mode_regex}/\1/"
+        grep -F "$pixiv_mode_search" | \
+        sed -e "s/${pixiv_mode_regex}/\1/"
 }
 
 get_pixiv_img_id() {

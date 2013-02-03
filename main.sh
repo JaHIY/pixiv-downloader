@@ -19,7 +19,8 @@ get_cookie() {
 check_mode() {
     local pixiv_mode_search='class="works_display"'
     local pixiv_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\+\).*$'
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | grep -F "$pixiv_mode_search" | sed -e "s/${pixiv_mode_regex}/\1/"
+    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | \
+        grep -F "$pixiv_mode_search" | sed -e "s/${pixiv_mode_regex}/\1/"
 }
 
 get_pixiv_img_id() {
@@ -30,12 +31,17 @@ get_pixiv_img_id() {
 download_pixiv_manga_imgs() {
     local pixiv_manga_img_regex='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+_p[[:digit:]]\+\.[[:alpha:]]\+'
     local pixiv_manga_img_substitute='s;^\(http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\)\(_p[[:digit:]]\+\.[[:alpha:]]\+\)$;\1_big\3;g'
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | grep -o "$pixiv_manga_img_regex" | sed -e "$pixiv_manga_img_substitute" | xargs curl --remote-name-all -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}"
+    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | \
+        grep -o "$pixiv_manga_img_regex" | \
+        sed -e "$pixiv_manga_img_substitute" | \
+        xargs curl --remote-name-all -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}"
 }
 
 download_pixiv_single_img() {
     local pixiv_single_img_regex='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\.[[:alpha:]]\+'
-    local pixiv_img_url=$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_BIG_PREFIX}${1}" | grep -o "$pixiv_single_img_regex")
+    local pixiv_img_url=$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" \
+                            "${PIXIV_BIG_PREFIX}${1}" | 
+                        grep -o "$pixiv_single_img_regex")
     curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_BIG_PREFIX}${1}" "$pixiv_img_url"
 }
 
@@ -43,12 +49,16 @@ download_pixiv_img() {
     #echo 'download_pixiv_img() -> $1:' "$1" '$2:' "$2"
     case "$1" in
         'manga')
-            printf "Pixiv id $2 is a set of illustrations!\nI am downloading them for you......\n"
+            printf '%s\n' \
+                    "Pixiv id $2 is a set of illustrations!" \
+                    'I am downloading them for you......'
             download_pixiv_manga_imgs "$2"
             printf "Done!\n"
         ;;
         'big')
-            printf "Pixiv id $2 is a single illustration!\nI am downloading it for you......\n"
+            printf '%s\n' \
+                    "Pixiv id $2 is a single illustration!" \
+                    'I am downloading it for you......'
             download_pixiv_single_img "$2"
             printf "Done!\n"
         ;;

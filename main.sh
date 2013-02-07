@@ -1,11 +1,29 @@
 #!/bin/sh -
 
-COOKIE_FILE='cookie.txt'
+COOKIE_FILE="/tmp/cookie-pixiv-$$.txt"
 USER_AGENT='Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
+
+clean_up() {
+    local rm_code
+    printf 'Cleaning up...\n'
+    rm "$COOKIE_FILE"
+    rm_code=$?
+    if [ $rm_code -eq 0 ]
+    then
+        printf 'Done!\n'
+    else
+        printf "Error Code: ${rm_code}\n"
+    fi
+}
+
+clean_up_on_exit() {
+    clean_up
+    exit 1
+}
 
 get_config() {
     local where_am_i
@@ -77,6 +95,7 @@ download_pixiv_img() {
 
 main() {
     local pixiv_img_id=''
+    trap 'clean_up_on_exit' HUP INT QUIT TERM
     printf "Hello, master. My name is pixiv-downloader-$$. I am working for you now.\n"
     get_config
     get_cookie
@@ -85,6 +104,7 @@ main() {
         pixiv_img_id=$(get_pixiv_img_id "$line")
         download_pixiv_img $(check_mode "$pixiv_img_id") "$pixiv_img_id"
     done
+    clean_up
     printf 'My work is complete. Goodbye, master~\n'
 }
 

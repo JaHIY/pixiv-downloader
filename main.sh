@@ -11,7 +11,7 @@ get_config() {
     local where_am_i
     if [ -h "$0" ]
     then
-        where_am_i=$(readlink "$0")
+        where_am_i=$(readlink -f "$0")
     else
         where_am_i="$0"
     fi

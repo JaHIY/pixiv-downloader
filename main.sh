@@ -1,13 +1,22 @@
 #!/bin/sh -
 
-. ./config
-
 COOKIE_FILE='cookie.txt'
 USER_AGENT='Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
+
+get_config() {
+    local where_am_i
+    if [ -h "$0" ]
+    then
+        where_am_i=$(readlink "$0")
+    else
+        where_am_i="$0"
+    fi
+    source "$(dirname "$where_am_i")/config"
+}
 
 get_cookie() {
     printf 'Now I am getting cookie......'
@@ -69,6 +78,7 @@ download_pixiv_img() {
 main() {
     local pixiv_img_id=''
     printf "Hello, master. My name is pixiv-downloader-$$. I am working for you now.\n"
+    get_config
     get_cookie
     while read line
     do

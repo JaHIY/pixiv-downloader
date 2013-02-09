@@ -32,7 +32,7 @@ clean_up() {
 
 clean_up_on_exit() {
     printf '\n' 1>&2
-    err "Aborted by user! Exiting..."
+    err 'Aborted by user! Exiting...'
     sub_err 'Cleaning up...'
     clean_up
     exit 1

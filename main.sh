@@ -16,7 +16,7 @@ sub_msg() {
 }
 
 err() {
-    printf '\033[31;1m==> ERROR:\033[0m \033[1m%s\033[0m\n' "$@"
+    printf '\033[31;1m==> ERROR:\033[0m \033[1m%s\033[0m\n' "$@" 1>&2
 }
 
 clean_up() {
@@ -27,7 +27,7 @@ clean_up() {
 }
 
 clean_up_on_exit() {
-    printf '\n'
+    printf '\n' 1>&2
     err "Aborted by user! Exiting..."
     sub_msg 'Cleaning up...'
     clean_up

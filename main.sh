@@ -7,25 +7,34 @@ PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
 
+msg() {
+    printf '\033[32;1m==>\033[0m \033[1m%s\033[0m\n' "$@"
+}
+
+sub_msg() {
+    printf '  \033[34;1m->\033[0m \033[1m%s\033[0m\n' "$@"
+}
+
+err() {
+    printf '\033[31;1m==> ERROR:\033[0m \033[1m%s\033[0m\n' "$@"
+}
+
 clean_up() {
     local rm_code
-    printf 'Cleaning up...\n'
-    rm "$COOKIE_FILE"
+    rm_err=$(rm "$COOKIE_FILE" 2>&1)
     rm_code=$?
-    if [ $rm_code -eq 0 ]
-    then
-        printf 'Done!\n'
-    else
-        printf "Error Code: ${rm_code}\n"
-    fi
+    [ $rm_code -eq 0 ] || err "[${rm_code}] ${rm_err}"
 }
 
 clean_up_on_exit() {
+    printf '\n'
+    err "Aborted by user! Exiting..."
+    sub_msg 'Cleaning up...'
     clean_up
     exit 1
 }
 
-get_config() {
+load_config() {
     local where_am_i
     if [ -h "$0" ]
     then
@@ -37,10 +46,8 @@ get_config() {
 }
 
 get_cookie() {
-    printf 'Now I am getting cookie......'
     curl -s -c "$COOKIE_FILE" -A "$USER_AGENT" -d "mode=login&pixiv_id=${ACCOUNT}&pass=${PASSWORD}&skip=1" \
         'http://www.pixiv.net/login.php'
-    printf 'Done!\n'
 }
 
 check_mode() {
@@ -74,21 +81,14 @@ download_pixiv_single_img() {
 }
 
 download_pixiv_img() {
-    #echo 'download_pixiv_img() -> $1:' "$1" '$2:' "$2"
     case "$1" in
         'manga')
-            printf '%s\n' \
-                    "Pixiv id $2 is a set of illustrations!" \
-                    'I am downloading them for you......'
+            sub_msg "Found pixiv id ${2}... a set of illustrations"
             download_pixiv_manga_imgs "$2"
-            printf "Done!\n"
         ;;
         'big')
-            printf '%s\n' \
-                    "Pixiv id $2 is a single illustration!" \
-                    'I am downloading it for you......'
+            sub_msg "Found pixiv id ${2}... a single illustration"
             download_pixiv_single_img "$2"
-            printf "Done!\n"
         ;;
     esac
 }
@@ -96,16 +96,21 @@ download_pixiv_img() {
 main() {
     local pixiv_img_id=''
     trap 'clean_up_on_exit' HUP INT QUIT TERM
-    printf "Hello, master. My name is pixiv-downloader-$$. I am working for you now.\n"
-    get_config
+    msg "My name is pixiv-downloader-$$. I am working for you now."
+    msg 'Preparing for task...'
+    sub_msg 'Loading config...'
+    load_config
+    sub_msg 'Getting cookie...'
     get_cookie
+    msg 'Downloading...'
     while read line
     do
         pixiv_img_id=$(get_pixiv_img_id "$line")
         download_pixiv_img $(check_mode "$pixiv_img_id") "$pixiv_img_id"
     done
+    msg 'Cleaning up...'
     clean_up
-    printf 'My work is complete. Goodbye, master~\n'
+    msg "Finished downloading: $(date)"
 }
 
 main "$@"

@@ -19,6 +19,10 @@ err() {
     printf '\033[31;1m==> ERROR:\033[0m \033[1m%s\033[0m\n' "$@" 1>&2
 }
 
+sub_err() {
+    printf '  \033[33;1m->\033[0m \033[1m%s\033[0m\n' "$@" 1>&2
+}
+
 clean_up() {
     local rm_code
     rm_err=$(rm "$COOKIE_FILE" 2>&1)
@@ -29,7 +33,7 @@ clean_up() {
 clean_up_on_exit() {
     printf '\n' 1>&2
     err "Aborted by user! Exiting..."
-    sub_msg 'Cleaning up...'
+    sub_err 'Cleaning up...'
     clean_up
     exit 1
 }

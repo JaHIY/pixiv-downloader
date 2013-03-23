@@ -99,13 +99,17 @@ download_pixiv_img() {
 
 main() {
     local pixiv_img_id=''
+    local my_umask='077'
+    local old_umask=$(umask)
     trap 'clean_up_on_exit' HUP INT QUIT TERM
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
     sub_msg 'Loading config...'
     load_config
     sub_msg 'Getting cookie...'
+    umask "$my_umask"
     get_cookie
+    umask "$old_umask"
     msg 'Downloading...'
     while read line
     do

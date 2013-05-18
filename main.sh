@@ -25,7 +25,7 @@ sub_err() {
 
 clean_up() {
     local rm_code
-    rm_err=$(rm "$COOKIE_FILE" 2>&1)
+    rm_err="$(rm "$COOKIE_FILE" 2>&1)"
     rm_code=$?
     [ $rm_code -eq 0 ] || err "[${rm_code}] ${rm_err}"
 }
@@ -42,7 +42,7 @@ load_config() {
     local where_am_i
     if [ -h "$0" ]
     then
-        where_am_i=$(readlink -f "$0")
+        where_am_i="$(readlink -f "$0")"
     else
         where_am_i="$0"
     fi
@@ -56,20 +56,21 @@ get_cookie() {
 
 check_mode() {
     local pixiv_mode_search='class="works_display"'
-    local pixiv_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\+\).*$'
+    local pixiv_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\{1,\}\).*$'
     curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | \
         grep -F "$pixiv_mode_search" | \
         sed -e "s/${pixiv_mode_regex}/\1/"
 }
 
 get_pixiv_img_id() {
-    local pixiv_img_id_regex='^.*illust_id=\([[:digit:]]\+\).*$'
-    sed -e "s/${pixiv_img_id_regex}/\1/" <<< "$1"
+    local pixiv_img_id_regex='^.*illust_id=\([[:digit:]]\{1,\}\).*$'
+    local result="$(sed -e "s/${pixiv_img_id_regex}/\1/" <<< "$1")"
+    grep -s '[[:digit:]]\{1,\}' <<< "$result"
 }
 
 download_pixiv_manga_imgs() {
-    local pixiv_manga_img_regex='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+_p[[:digit:]]\+\.[[:alpha:]]\+'
-    local pixiv_manga_img_substitute='s;^\(http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\)\(_p[[:digit:]]\+\.[[:alpha:]]\+\)$;\1_big\3;g'
+    local pixiv_manga_img_regex='http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}_p[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}'
+    local pixiv_manga_img_substitute='s;^\(http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}\)\(_p[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}\)$;\1_big\3;g'
     curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | \
         grep -o "$pixiv_manga_img_regex" | \
         sed -e "$pixiv_manga_img_substitute" | \
@@ -77,10 +78,10 @@ download_pixiv_manga_imgs() {
 }
 
 download_pixiv_single_img() {
-    local pixiv_single_img_regex='http:\/\/[^.]\+\.pixiv\.net\/\([^/]\+\/\)\{3\}[[:digit:]]\+\.[[:alpha:]]\+'
-    local pixiv_img_url=$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" \
+    local pixiv_single_img_regex='http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}'
+    local pixiv_img_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" \
                             "${PIXIV_BIG_PREFIX}${1}" | 
-                        grep -o "$pixiv_single_img_regex")
+                        grep -o "$pixiv_single_img_regex")"
     curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_BIG_PREFIX}${1}" "$pixiv_img_url"
 }
 
@@ -100,7 +101,7 @@ download_pixiv_img() {
 main() {
     local pixiv_img_id=''
     local my_umask='077'
-    local old_umask=$(umask)
+    local old_umask="$(umask)"
     trap 'clean_up_on_exit' HUP INT QUIT TERM
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
@@ -111,10 +112,15 @@ main() {
     get_cookie
     umask "$old_umask"
     msg 'Downloading...'
-    while read line
+    while read line || [ -n "$line" ]
     do
-        pixiv_img_id=$(get_pixiv_img_id "$line")
-        download_pixiv_img $(check_mode "$pixiv_img_id") "$pixiv_img_id"
+        pixiv_img_id="$(get_pixiv_img_id "$line")"
+        if [ $? -eq 0 ]
+        then
+            download_pixiv_img "$(check_mode "$pixiv_img_id")" "$pixiv_img_id"
+        else
+            sub_err 'Oops! Wrong pixiv id!'
+        fi
     done
     msg 'Cleaning up...'
     clean_up

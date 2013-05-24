@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-COOKIE_FILE="/tmp/cookie-pixiv-$$.txt"
+
 USER_AGENT='Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
@@ -100,17 +100,14 @@ download_pixiv_img() {
 
 main() {
     local pixiv_img_id=''
-    local my_umask='077'
-    local old_umask="$(umask)"
     trap 'clean_up_on_exit' HUP INT QUIT TERM
+    COOKIE_FILE="$(mktemp --tmpdir cookie-pixiv.XXXXXXXXXX)"
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
     sub_msg 'Loading config...'
     load_config
     sub_msg 'Getting cookie...'
-    umask "$my_umask"
     get_cookie
-    umask "$old_umask"
     msg 'Downloading...'
     while read line || [ -n "$line" ]
     do

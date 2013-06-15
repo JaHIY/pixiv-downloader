@@ -1,11 +1,11 @@
 #!/bin/sh -
 
-
 USER_AGENT='Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
+PIXIV_SERIES_PREFIX='http://www.pixiv.net/member_illust.php?id='
 
 msg() {
     printf '\033[32;1m==>\033[0m \033[1m%s\033[0m\n' "$@"
@@ -54,17 +54,47 @@ get_cookie() {
         'http://www.pixiv.net/login.php'
 }
 
-check_mode() {
-    local pixiv_mode_search='class="works_display"'
-    local pixiv_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\{1,\}\).*$'
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${PIXIV_MEDIUM_PREFIX}${1}" | \
-        grep -F "$pixiv_mode_search" | \
-        sed -e "s/${pixiv_mode_regex}/\1/"
+get_url_type() {
+    local pixiv_img_mode_search='class="works_display"'
+    local pixiv_img_mode_regex='^.*class="works_display"><a href="member_illust.php?mode=\([^&]\{1,\}\).*$'
+    local pixiv_img_mode="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "${1}" |
+        grep -F "$pixiv_img_mode_search" |
+        sed -e "s/${pixiv_img_mode_regex}/\1/")"
+    local pixiv_series_url="$(grep "^$PIXIV_SERIES_PREFIX" <<< "${1}")"
+    
+    if [[ "$pixiv_img_mode" != "" ]]; then
+        echo "$pixiv_img_mode"
+    elif [[ "$pixiv_series_url" != "" ]]; then
+        local series_page="$(get_pixiv_page "${1}")"
+        
+        if [[ "$series_page" != "" ]]; then
+            echo "page"
+        else
+            echo "series"
+        fi
+    fi
 }
 
-get_pixiv_img_id() {
-    local pixiv_img_id_regex='^.*illust_id=\([[:digit:]]\{1,\}\).*$'
-    local result="$(sed -e "s/${pixiv_img_id_regex}/\1/" <<< "$1")"
+get_pixiv_page() {
+    result="$(sed -e "s/^.*&p=\(.*\)$/\1/" <<< "$1")"
+    
+    if [[ "$result" != "$1" ]]; then
+        echo $result
+    else
+        echo ""
+    fi
+}
+
+get_pixiv_series() {
+    local pixiv_series_regex='^.*id=\(.*\)$'
+    local result="$(sed -e "s/${pixiv_series_regex}/\1/" <<< "$1")"
+    local no_pages="$(sed -e "s/^\(.*\)&p=.*$/\1/" <<< "$result")"
+    echo "$no_pages"
+}
+
+get_pixiv_id() {
+    local pixiv_id_regex='^.*id=\([[:digit:]]\{1,\}\).*$'
+    local result="$(sed -e "s/${pixiv_id_regex}/\1/" <<< "$1")"
     grep -s '[[:digit:]]\{1,\}' <<< "$result"
 }
 
@@ -85,21 +115,64 @@ download_pixiv_single_img() {
     curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_BIG_PREFIX}${1}" "$pixiv_img_url"
 }
 
-download_pixiv_img() {
-    case "$1" in
+download_pixiv_page() {
+    curl -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${1}" "${1}" |
+        grep -o "a href=\"/member_illust.php?mode=medium&amp;illust_id=\([[:digit:]]*\)\"" |
+        grep -o "[[:digit:]]*" |
+    while read line || [ -n "$line" ]
+    do
+        download_pixiv_url "${PIXIV_MEDIUM_PREFIX}${line}"
+    done
+}
+
+download_pixiv_series() {
+    local curr_page="1"
+    while [[ "$curr_page" != "" ]]; do
+        local url="${PIXIV_SERIES_PREFIX}${1}&p=$curr_page"
+        
+        curl -b "$COOKIE_FILE" -A "$USER_AGENT" -e "$url" "$url" |
+            grep -q "'_trackEvent','User Access','member_illust','no list'"
+        local bad_page="$?"
+        
+        if [[ $bad_page == "1" ]]; then
+            download_pixiv_url "$url"
+            curr_page="$(expr $curr_page + 1)"
+        else
+            curr_page=""
+        fi
+    done
+}
+
+download_pixiv_url() {
+    local url="${1}"
+    local url_type="$(get_url_type "$url")"
+    
+    case "$url_type" in
         'manga')
-            sub_msg "Found pixiv id ${2}... a set of illustrations"
-            download_pixiv_manga_imgs "$2"
+            local id="$(get_pixiv_id "$url")"
+            sub_msg "Found pixiv id ${id}... a set of illustrations"
+            download_pixiv_manga_imgs "${id}"
         ;;
         'big')
-            sub_msg "Found pixiv id ${2}... a single illustration"
-            download_pixiv_single_img "$2"
+            local id="$(get_pixiv_id "$url")"
+            sub_msg "Found pixiv id ${id}... a single illustration"
+            download_pixiv_single_img "${id}"
+        ;;
+        'page')
+            local series="$(get_pixiv_series "$url")"
+            local page="$(get_pixiv_page "$url")"
+            sub_msg "Found pixiv series ${series}... page $page"
+            download_pixiv_page $url
+        ;;
+        'series')
+            local series="$(get_pixiv_series "$url")"
+            sub_msg "Found pixiv series ${series}... a set of pages"
+            download_pixiv_series $series
         ;;
     esac
 }
 
 main() {
-    local pixiv_img_id=''
     trap 'clean_up_on_exit' HUP INT QUIT TERM
     COOKIE_FILE="$(mktemp --tmpdir cookie-pixiv.XXXXXXXXXX)"
     msg "My name is pixiv-downloader-$$. I am working for you now."
@@ -111,13 +184,7 @@ main() {
     msg 'Downloading...'
     while read line || [ -n "$line" ]
     do
-        pixiv_img_id="$(get_pixiv_img_id "$line")"
-        if [ $? -eq 0 ]
-        then
-            download_pixiv_img "$(check_mode "$pixiv_img_id")" "$pixiv_img_id"
-        else
-            sub_err 'Oops! Wrong pixiv id!'
-        fi
+        download_pixiv_url "$line"
     done
     msg 'Cleaning up...'
     clean_up

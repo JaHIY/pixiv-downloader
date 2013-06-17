@@ -24,9 +24,8 @@ sub_err() {
 }
 
 clean_up() {
-    local rm_code
-    rm_err="$(rm "$COOKIE_FILE" 2>&1)"
-    rm_code="$?"
+    local rm_err="$(rm "$COOKIE_FILE" 2>&1)"
+    local rm_code="$?"
     [ "$rm_code" -eq 0 ] || err "[${rm_code}] ${rm_err}"
 }
 
@@ -39,8 +38,8 @@ clean_up_on_exit() {
 }
 
 load_config() {
-    local where_am_i
-    if [ -h "$0" ]; then
+    local where_am_i=''
+    if [ -L "$0" ]; then
         where_am_i="$(readlink -f "$0")"
     else
         where_am_i="$0"
@@ -61,12 +60,12 @@ get_url_type() {
         sed -e "s/${pixiv_img_mode_regex}/\1/")"
     local pixiv_series_url="$(grep "^http:\/\/www\.pixiv\.net\/member_illust\.php?id=" <<< "$1")"
 
-    if [ "$pixiv_img_mode" != '' ]; then
+    if [ -n "$pixiv_img_mode" ]; then
         printf "${pixiv_img_mode}\n"
-    elif [ "$pixiv_series_url" != '' ]; then
+    elif [ -n "$pixiv_series_url" ]; then
         local series_page="$(get_pixiv_page "$1")"
 
-        if [ "$series_page" != '' ]; then
+        if [ -n "$series_page" ]; then
             printf 'page\n'
         else
             printf 'series\n'
@@ -77,7 +76,7 @@ get_url_type() {
 }
 
 get_pixiv_page() {
-    result="$(sed -e "s/^.*&p=\(.*\)$/\1/" <<< "$1")"
+    local result="$(sed -e "s/^.*&p=\(.*\)$/\1/" <<< "$1")"
 
     if [ "$result" != "$1" ]; then
         printf "${result}\n"
@@ -120,8 +119,7 @@ download_pixiv_page() {
     curl -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${1}" "${1}" | \
         grep -o "a href=\"/\?member_illust\.php?mode=medium&amp;illust_id=[[:digit:]]\{1,\}\"" | \
         grep -o "[[:digit:]]\{1,\}" | \
-    while read line || [ -n "$line" ]
-    do
+    while read line || [ -n "$line" ]; do
         download_pixiv_url "${PIXIV_MEDIUM_PREFIX}${line}"
     done
 }
@@ -130,18 +128,18 @@ download_pixiv_series() {
     local curr_page='1'
     local url=''
     local bad_page=''
-    while [ "$curr_page" != '' ]; do
+    while [ -n "$curr_page" ]; do
         url="${PIXIV_SERIES_PREFIX}${1}&p=${curr_page}"
 
         curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "$url" "$url" | \
             grep -q "'_trackEvent','User Access','member_illust','no list'"
         bad_page="$?"
 
-        if [ "$bad_page" == '1' ]; then
+        if [ "$bad_page" -eq 1 ]; then
             download_pixiv_url "$url"
             curr_page="$(expr "$curr_page" + 1)"
         else
-            curr_page=""
+            curr_page=''
         fi
     done
 }

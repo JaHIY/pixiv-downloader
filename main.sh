@@ -116,7 +116,7 @@ download_pixiv_single_img() {
 }
 
 download_pixiv_page() {
-    curl -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${1}" "${1}" | \
+    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${1}" "${1}" | \
         grep -o "a href=\"/\?member_illust\.php?mode=medium&amp;illust_id=[[:digit:]]\{1,\}\"" | \
         grep -o "[[:digit:]]\{1,\}" | \
     while read line || [ -n "$line" ]; do

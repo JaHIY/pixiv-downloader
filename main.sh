@@ -5,7 +5,7 @@ PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_i
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
-PIXIV_SERIES_PREFIX='http://www.pixiv.net/member_illust.php?id='
+
 
 msg() {
     printf '\033[32;1m==>\033[0m \033[1m%s\033[0m\n' "$@"
@@ -55,14 +55,9 @@ get_cookie() {
 get_url_type() {
     local pixiv_img_mode_search='class="works_display"'
     local pixiv_img_mode_regex='^.*class="works_display"><a href="member_illust\.php?mode=\([^&]\{1,\}\).*$'
-    local pixiv_img_mode="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "$1" | \
-        grep -F "$pixiv_img_mode_search" | \
-        sed -e "s/${pixiv_img_mode_regex}/\1/")"
     local pixiv_series_url="$(grep "^http:\/\/www\.pixiv\.net\/member_illust\.php?id=" <<< "$1")"
 
-    if [ -n "$pixiv_img_mode" ]; then
-        printf "${pixiv_img_mode}\n"
-    elif [ -n "$pixiv_series_url" ]; then
+    if [ -n "$pixiv_series_url" ]; then
         local series_page="$(get_pixiv_page "$1")"
 
         if [ -n "$series_page" ]; then
@@ -71,8 +66,30 @@ get_url_type() {
             printf 'series\n'
         fi
     else
-        printf 'unknown\n'
+        local pixiv_bookmarks_url="$(grep "^http:\/\/www\.pixiv\.net\/bookmark\.php" <<< "$1")"
+        if [ -n "$pixiv_bookmarks_url" ]; then
+            local series_page="$(get_pixiv_page "$1")"
+
+            if [ -n "$series_page" ]; then
+                printf 'bookmark\n'
+            else
+                printf 'bookmarks\n'
+            fi
+        else
+            local pixiv_img_mode="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "$1" | \
+                grep -F "$pixiv_img_mode_search" | \
+                sed -e "s/${pixiv_img_mode_regex}/\1/")"
+            if [ -n "$pixiv_img_mode" ]; then
+                printf "${pixiv_img_mode}\n"
+            else
+                printf 'unknown\n'
+            fi
+        fi
     fi
+}
+
+get_pixiv_bookmark_tag() {
+    printf '%b\n' "$(sed -n -e 's/^.*bookmark\.php.*[?&]tag=\(.\{1,\}\)$/\1/' -e 's/^\(.*\)&.*$/\1/' -e 's/%/\\x/gp' <<< "$1")"
 }
 
 get_pixiv_page() {
@@ -129,10 +146,10 @@ download_pixiv_series() {
     local url=''
     local bad_page=''
     while [ -n "$curr_page" ]; do
-        url="${PIXIV_SERIES_PREFIX}${1}&p=${curr_page}"
+        url="${1}&p=${curr_page}"
 
         curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "$url" "$url" | \
-            grep -q "'_trackEvent','User Access','member_illust','no list'"
+            grep -q "'_trackEvent','User Access','[^']\{1,\}','no list'"
         bad_page="$?"
 
         if [ "$bad_page" -eq 1 ]; then
@@ -162,13 +179,32 @@ download_pixiv_url() {
         'page')
             local series="$(get_pixiv_series "$url")"
             local page="$(get_pixiv_page "$url")"
-            sub_msg "Found pixiv series ${series}... page $page"
+            sub_msg "Found pixiv series ${series}... page ${page}"
             download_pixiv_page "$url"
         ;;
         'series')
             local series="$(get_pixiv_series "$url")"
             sub_msg "Found pixiv series ${series}... a set of pages"
-            download_pixiv_series "$series"
+            download_pixiv_series "$url"
+        ;;
+        'bookmark')
+            local tag="$(get_pixiv_bookmark_tag "$url")"
+            local page="$(get_pixiv_page "$url")"
+            if [ -n "$tag" ]; then
+                sub_msg "Found my bookmarks... tag ${tag}... page ${page}"
+            else
+                sub_msg "Found my bookmarks... page ${page}"
+            fi
+            download_pixiv_page "$url"
+        ;;
+        'bookmarks')
+            local tag="$(get_pixiv_bookmark_tag "$url")"
+            if [ -n "$tag" ]; then
+                sub_msg "Found my bookmarks... tag ${tag}... a set of pages"
+            else
+                sub_msg "Found my bookmarks... a set of pages"
+            fi
+            download_pixiv_series "$url"
         ;;
         *)
             err "I don't know which type the url is."

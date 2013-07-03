@@ -216,7 +216,7 @@ download_pixiv_url() {
 
 main() {
     trap 'clean_up_on_exit' HUP INT QUIT TERM
-    COOKIE_FILE="$(mktemp -t cookie-pixiv)"
+    COOKIE_FILE="$(mktemp "${TMPDIR-/tmp}/cookie-pixiv.XXXXXXXXXX")"
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
     sub_msg 'Loading config...'

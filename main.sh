@@ -24,14 +24,12 @@ sub_err() {
 }
 
 clean_up() {
-    local rm_err="$(rm "$COOKIE_FILE" 2>&1)"
-    local rm_code="$?"
-    [ "$rm_code" -eq 0 ] || err "[${rm_code}] ${rm_err}"
+    [ -f "$COOKIE_FILE" ] && rm "$COOKIE_FILE"
 }
 
 clean_up_on_exit() {
     printf '\n' 1>&2
-    err 'Aborted by user! Exiting...'
+    err 'Exiting...'
     sub_err 'Cleaning up...'
     clean_up
     exit 1
@@ -215,7 +213,7 @@ download_pixiv_url() {
 }
 
 main() {
-    trap 'clean_up_on_exit' HUP INT QUIT TERM
+    trap 'clean_up_on_exit' EXIT
     local COOKIE_FILE="$(mktemp "${TMPDIR-/tmp}/cookie-pixiv.XXXXXXXXXX")"
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
@@ -228,8 +226,6 @@ main() {
     do
         download_pixiv_url "$line"
     done
-    msg 'Cleaning up...'
-    clean_up
     msg "Finished downloading: $(date)"
 }
 

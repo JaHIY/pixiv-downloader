@@ -6,7 +6,6 @@ PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
 PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
 
-
 msg() {
     printf '\033[32;1m==>\033[0m \033[1m%s\033[0m\n' "$@"
 }
@@ -28,6 +27,12 @@ clean_up() {
 }
 
 clean_up_on_exit() {
+    msg 'Exiting...'
+    sub_msg 'Cleaning up...'
+    clean_up
+}
+
+clean_up_on_error() {
     printf '\n' 1>&2
     err 'Exiting...'
     sub_err 'Cleaning up...'

@@ -1,6 +1,7 @@
 #!/bin/sh -
 
 USER_AGENT='Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Firefox/23.0'
+PIXIV_PREFIX='http://www.pixiv.net'
 PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
 PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
 PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
@@ -119,12 +120,15 @@ get_pixiv_id() {
 }
 
 download_pixiv_manga_imgs() {
-    local pixiv_manga_img_regex='http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}_p[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}'
-    local pixiv_manga_img_substitute='s;^\(http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}\)\(_p[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}\)$;\1_big\3;g'
     curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | \
-        grep -o "$pixiv_manga_img_regex" | \
-        sed -e "$pixiv_manga_img_substitute" | \
-        xargs curl --remote-name-all -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}"
+        grep -o '\/member_illust\.php?mode=manga_big&amp;illust_id=[[:digit:]]\{1,\}&amp;page=[[:digit:]]\{1,\}' | \
+        sed -e 's/&amp;/\&/g' | \
+        while read -r line; do
+            local pixiv_img_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}" "${PIXIV_PREFIX}${line}" | \
+                grep -o '<img[[:space:]]src="http:\/\/[^.]\{1,\}\.pixiv\.net\/img-original\/img\/[^"]\{1,\}' | \
+                grep -o 'http:\/\/.\{1,\}$')"
+            curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_PREFIX}${line}" "$pixiv_img_url"
+        done
 }
 
 download_pixiv_single_img() {

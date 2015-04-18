@@ -2,10 +2,10 @@
 
 USER_AGENT='Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Firefox/23.0'
 PIXIV_PREFIX='http://www.pixiv.net'
-PIXIV_MEDIUM_PREFIX='http://www.pixiv.net/member_illust.php?mode=medium&illust_id='
-PIXIV_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=big&illust_id='
-PIXIV_MANGA_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga&illust_id='
-PIXIV_MANGA_BIG_PREFIX='http://www.pixiv.net/member_illust.php?mode=manga_big&illust_id='
+PIXIV_MEDIUM_PREFIX="${PIXIV_PREFIX}/member_illust.php?mode=medium&illust_id="
+PIXIV_BIG_PREFIX="${PIXIV_PREFIX}/member_illust.php?mode=big&illust_id="
+PIXIV_MANGA_PREFIX="${PIXIV_PREFIX}/member_illust.php?mode=manga&illust_id="
+PIXIV_MANGA_BIG_PREFIX="${PIXIV_PREFIX}/member_illust.php?mode=manga_big&illust_id="
 
 msg() {
     printf '\033[32;1m==>\033[0m \033[1m%s\033[0m\n' "$@"
@@ -56,116 +56,52 @@ get_cookie() {
         'http://www.pixiv.net/login.php'
 }
 
+get_image_id() {
+    local url="$1"
+    printf "%s\n" "$(printf '%s\n' "$url" | grep -o 'illust_id=[[:digit:]]\{1,\}' | \
+        sed 's/illust_id=\([[:digit:]]\{1,\}\)/\1/' )"
+}
+
 get_url_type() {
-    local pixiv_img_mode_search='class="works_display"'
-    local pixiv_img_mode_regex='^.*class="works_display"><a href="member_illust\.php?mode=\([^&]\{1,\}\).*$'
-    local pixiv_series_url="$(grep "^http:\/\/www\.pixiv\.net\/member_illust\.php?id=" <<< "$1")"
+    local url="$1"
+    local url_type='unknown'
+    local image_id="$(get_image_id "$url")"
 
-    if [ -n "$pixiv_series_url" ]; then
-        local series_page="$(get_pixiv_page "$1")"
-
-        if [ -n "$series_page" ]; then
-            printf 'page\n'
-        else
-            printf 'series\n'
-        fi
-    else
-        local pixiv_bookmarks_url="$(grep "^http:\/\/www\.pixiv\.net\/bookmark\.php" <<< "$1")"
-        if [ -n "$pixiv_bookmarks_url" ]; then
-            local series_page="$(get_pixiv_page "$1")"
-
-            if [ -n "$series_page" ]; then
-                printf 'bookmark\n'
-            else
-                printf 'bookmarks\n'
-            fi
-        else
-            local pixiv_img_mode="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" "$1" | \
-                grep -F "$pixiv_img_mode_search" | \
-                sed -e "s/${pixiv_img_mode_regex}/\1/")"
-            if [ -n "$pixiv_img_mode" ]; then
-                printf "${pixiv_img_mode}\n"
-            else
-                printf 'unknown\n'
-            fi
-        fi
+    if [ -n "$image_id" ]; then
+        url_type='image'
     fi
+
+    printf "${url_type}\n"
 }
 
-get_pixiv_bookmark_tag() {
-    printf '%b\n' "$(sed -n -e 's/^.*bookmark\.php.*[?&]tag=\(.\{1,\}\)$/\1/' -e 's/^\(.*\)&.*$/\1/' -e 's/%/\\x/gp' <<< "$1")"
-}
+download_pixiv_image() {
+    local image_id="$1"
+    local image_page="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" \
+        "${PIXIV_MEDIUM_PREFIX}${image_id}")"
+    local single_image_url="$(printf '%s\n' "$image_page" | \
+        xidel -q -e '<img data-src="{.}" class="original-image">?' -)"
+    local multiple_images_url="$(printf '%s\n' "$image_page" | \
+        xidel -q -e '<div class="works_display"><a href="{.}"></a></div>?' -)"
 
-get_pixiv_page() {
-    local result="$(sed -e "s/^.*&p=\(.*\)$/\1/" <<< "$1")"
-
-    if [ "$result" != "$1" ]; then
-        printf "${result}\n"
+    if [ -n "$single_image_url" ]; then
+        sub_msg 'image_type: single'
+        sub_msg "Downloading from ${single_image_url}"
+        curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "$single_image_url"
+    elif [ -n "$multiple_images_url" ]; then
+        sub_msg 'image_type: multiple'
+        curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
+            -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "${PIXIV_PREFIX}/${multiple_images_url}" | \
+            xidel -q -e '<div class="item-container"><a href="{.}"></a></div>*' - | \
+            while read line || [ -n "$line" ]; do
+                local image_download_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
+                    -e "${PIXIV_PREFIX}/${multiple_images_url}" "${PIXIV_PREFIX}${line}" | \
+                    xidel -q -e '<img src="{.}">?' -)"
+                sub_msg "Downloading from ${image_download_url}"
+                curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "$image_download_url"
+            done
     else
-        printf "\n"
+        sub_err 'image_type: unknown'
     fi
-}
-
-get_pixiv_series() {
-    local pixiv_series_regex='^.*id=\(.*\)$'
-    local result="$(sed -e "s/${pixiv_series_regex}/\1/" <<< "$1")"
-    local no_pages="$(sed -e 's/^\(.*\)&p=.*$/\1/' <<< "$result")"
-    printf "${no_pages}\n"
-}
-
-get_pixiv_id() {
-    local pixiv_id_regex='^.*id=\([[:digit:]]\{1,\}\).*$'
-    local result="$(sed -e "s/${pixiv_id_regex}/\1/" <<< "$1")"
-    grep -s '[[:digit:]]\{1,\}' <<< "$result"
-}
-
-download_pixiv_manga_imgs() {
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" "${PIXIV_MANGA_PREFIX}${1}" | \
-        grep -o '\/member_illust\.php?mode=manga_big&amp;illust_id=[[:digit:]]\{1,\}&amp;page=[[:digit:]]\{1,\}' | \
-        sed -e 's/&amp;/\&/g' | \
-        while read -r line; do
-            local pixiv_img_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MANGA_BIG_PREFIX}${1}" "${PIXIV_PREFIX}${line}" | \
-                grep -o '<img[[:space:]]src="http:\/\/[^.]\{1,\}\.pixiv\.net\/img-original\/img\/[^"]\{1,\}' | \
-                grep -o 'http:\/\/.\{1,\}$')"
-            curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_PREFIX}${line}" "$pixiv_img_url"
-        done
-}
-
-download_pixiv_single_img() {
-    local pixiv_single_img_regex='http:\/\/[^.]\{1,\}\.pixiv\.net\/\([^/]\{1,\}\/\)\{3\}[[:digit:]]\{1,\}\.[[:alpha:]]\{1,\}'
-    local pixiv_img_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${1}" \
-                            "${PIXIV_BIG_PREFIX}${1}" | \
-                        grep -o "$pixiv_single_img_regex")"
-    curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_BIG_PREFIX}${1}" "$pixiv_img_url"
-}
-
-download_pixiv_page() {
-    curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${1}" "${1}" | \
-        grep -o "a href=\"/\?member_illust\.php?mode=medium&amp;illust_id=[[:digit:]]\{1,\}\"" | \
-        grep -o "[[:digit:]]\{1,\}" | \
-    while read line || [ -n "$line" ]; do
-        download_pixiv_url "${PIXIV_MEDIUM_PREFIX}${line}"
-    done
-}
-
-download_pixiv_series() {
-    local curr_page='1'
-    local url=''
-    local bad_page=''
-    while [ -n "$curr_page" ]; do
-        url="${1}&p=${curr_page}"
-
-        curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "$url" "$url" | \
-            grep -q "'_trackEvent','User Access','[^']\{1,\}','no list'"
-        bad_page="$?"
-
-        if [ "$bad_page" -eq 1 ]; then
-            download_pixiv_url "$url"
-            curr_page="$(expr "$curr_page" + 1)"
-        else
-            curr_page=''
-        fi
-    done
 }
 
 download_pixiv_url() {
@@ -173,49 +109,14 @@ download_pixiv_url() {
     local url_type="$(get_url_type "$url")"
 
     case "$url_type" in
-        'manga')
-            local id="$(get_pixiv_id "$url")"
-            sub_msg "Found pixiv id ${id}... a set of illustrations"
-            download_pixiv_manga_imgs "$id"
-        ;;
-        'big')
-            local id="$(get_pixiv_id "$url")"
-            sub_msg "Found pixiv id ${id}... a single illustration"
-            download_pixiv_single_img "$id"
-        ;;
-        'page')
-            local series="$(get_pixiv_series "$url")"
-            local page="$(get_pixiv_page "$url")"
-            sub_msg "Found pixiv series ${series}... page ${page}"
-            download_pixiv_page "$url"
-        ;;
-        'series')
-            local series="$(get_pixiv_series "$url")"
-            sub_msg "Found pixiv series ${series}... a set of pages"
-            download_pixiv_series "$url"
-        ;;
-        'bookmark')
-            local tag="$(get_pixiv_bookmark_tag "$url")"
-            local page="$(get_pixiv_page "$url")"
-            if [ -n "$tag" ]; then
-                sub_msg "Found my bookmarks... tag ${tag}... page ${page}"
-            else
-                sub_msg "Found my bookmarks... page ${page}"
-            fi
-            download_pixiv_page "$url"
-        ;;
-        'bookmarks')
-            local tag="$(get_pixiv_bookmark_tag "$url")"
-            if [ -n "$tag" ]; then
-                sub_msg "Found my bookmarks... tag ${tag}... a set of pages"
-            else
-                sub_msg "Found my bookmarks... a set of pages"
-            fi
-            download_pixiv_series "$url"
+        'image')
+            local image_id="$(get_image_id "$url")"
+            sub_msg "Found image id ${image_id}..."
+            download_pixiv_image "$image_id"
         ;;
         *)
             err "I don't know which type the url is."
-            sub_err "url: ${1}"
+            sub_err "url: ${url}"
             sub_err "url_type: ${url_type}"
         ;;
     esac

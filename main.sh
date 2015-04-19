@@ -23,16 +23,8 @@ sub_err() {
     printf '  \033[33;1m->\033[0m \033[1m%s\033[0m\n' "$@" 1>&2
 }
 
-rm_files_if_exists() {
-    while [ $# -gt 0 ]; do
-        local file_name="$1"
-        [ -f "$file_name" ] && rm "$file_name"
-        shift
-    done
-}
-
 clean_up() {
-    rm_files_if_exists "$COOKIE_FILE" "$URL_LIST"
+    [ -d "$MY_TMP_DIR" ] && rm -r "$MY_TMP_DIR"
 }
 
 clean_up_on_exit() {
@@ -132,8 +124,9 @@ download_pixiv_url() {
 
 main() {
     trap 'clean_up_on_error' INT TERM HUP
-    local COOKIE_FILE="$(mktemp "${TMPDIR-/tmp}/cookie-pixiv.XXXXXXXXXX")"
-    local URL_LIST="$(mktemp "${TMPDIR-/tmp}/urllist-pixiv.XXXXXXXXXX")"
+    local MY_TMP_DIR="$(mktemp -d "${TMPDIR-/tmp}/pixiv-downloader.XXXXXXXXXX")"
+    local COOKIE_FILE="$(mktemp "${MY_TMP_DIR}/cookie.XXXXXX")"
+    local URL_LIST="$(mktemp "${MY_TMP_DIR}/url_list.XXXXXX")"
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
     sub_msg 'Loading config...'

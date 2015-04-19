@@ -23,8 +23,16 @@ sub_err() {
     printf '  \033[33;1m->\033[0m \033[1m%s\033[0m\n' "$@" 1>&2
 }
 
+rm_files_if_exists() {
+    while [ $# -gt 0 ]; do
+        local file_name="$1"
+        [ -f "$file_name" ] && rm "$file_name"
+        shift
+    done
+}
+
 clean_up() {
-    [ -f "$COOKIE_FILE" ] && rm "$COOKIE_FILE"
+    rm_files_if_exists "$COOKIE_FILE" "$URL_LIST"
 }
 
 clean_up_on_exit() {
@@ -85,8 +93,8 @@ download_pixiv_image() {
 
     if [ -n "$single_image_url" ]; then
         sub_msg 'image_type: single'
-        sub_msg "Downloading from ${single_image_url}"
-        curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "$single_image_url"
+        sub_msg "Get download url ${single_image_url}"
+        printf '%s %s\n' "$single_image_url" "${PIXIV_MEDIUM_PREFIX}${image_id}" >> "$URL_LIST"
     elif [ -n "$multiple_images_url" ]; then
         sub_msg 'image_type: multiple'
         curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
@@ -96,8 +104,8 @@ download_pixiv_image() {
                 local image_download_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
                     -e "${PIXIV_PREFIX}/${multiple_images_url}" "${PIXIV_PREFIX}${line}" | \
                     xidel -q -e '<img src="{.}">?' -)"
-                sub_msg "Downloading from ${image_download_url}"
-                curl -O -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "$image_download_url"
+                sub_msg "Get download url ${image_download_url}"
+                printf '%s %s\n' "$image_download_url" "${PIXIV_MEDIUM_PREFIX}${image_id}" >> "$URL_LIST"
             done
     else
         sub_err 'image_type: unknown'
@@ -123,20 +131,24 @@ download_pixiv_url() {
 }
 
 main() {
-    trap 'clean_up_on_exit' EXIT
+    trap 'clean_up_on_error' INT TERM HUP
     local COOKIE_FILE="$(mktemp "${TMPDIR-/tmp}/cookie-pixiv.XXXXXXXXXX")"
+    local URL_LIST="$(mktemp "${TMPDIR-/tmp}/urllist-pixiv.XXXXXXXXXX")"
     msg "My name is pixiv-downloader-$$. I am working for you now."
     msg 'Preparing for task...'
     sub_msg 'Loading config...'
     load_config
     sub_msg 'Getting cookie...'
     get_cookie
-    msg 'Downloading...'
-    while read line || [ -n "$line" ]
-    do
+    msg 'Analyzing...'
+    while read line || [ -n "$line" ]; do
         download_pixiv_url "$line"
     done
+    msg 'Downloading...'
+    parallel --bar --colsep ' ' -q curl -s -O --retry 10 -b "$COOKIE_FILE" -A "$USER_AGENT" \
+        -e "{2}" "{1}" :::: "$URL_LIST"
     msg "Finished downloading: $(date)"
+    clean_up_on_exit
 }
 
 main "$@"

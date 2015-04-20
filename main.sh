@@ -1,4 +1,4 @@
-l!/bin/sh -
+#!/bin/sh -
 
 USER_AGENT='Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Firefox/23.0'
 PIXIV_PREFIX='http://www.pixiv.net'

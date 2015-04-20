@@ -3,7 +3,7 @@
 ### Environment:
 
  * shell
- * [xidel](http://videlibri.sourceforge.net/xidel.html) (Arch Linux users can install it from [AUR](https://aur.archlinux.org/packages/xidel/))
+ * [pup](https://github.com/ericchiang/pup) (Arch Linux users can install it from [AUR](https://aur.archlinux.org/packages/pup/))
  * [GNU Parallel](https://www.gnu.org/software/parallel/) (Arch Linux users can install it from [official community repository](https://www.archlinux.org/packages/community/any/parallel/))
 
 ### How to use

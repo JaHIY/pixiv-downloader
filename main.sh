@@ -79,9 +79,9 @@ download_pixiv_image() {
     local image_page="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" -e "${PIXIV_MEDIUM_PREFIX}${image_id}" \
         "${PIXIV_MEDIUM_PREFIX}${image_id}")"
     local single_image_url="$(printf '%s\n' "$image_page" | \
-        xidel -q -e '<img data-src="{.}" class="original-image">?' -)"
+        pup -p 'img.original-image attr{data-src}')"
     local multiple_images_url="$(printf '%s\n' "$image_page" | \
-        xidel -q -e '<div class="works_display"><a href="{.}"></a></div>?' -)"
+        pup -p '.works_display > a attr{href}')"
 
     if [ -n "$single_image_url" ]; then
         sub_msg 'image_type: single'
@@ -91,11 +91,11 @@ download_pixiv_image() {
         sub_msg 'image_type: multiple'
         curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
             -e "${PIXIV_MEDIUM_PREFIX}${image_id}" "${PIXIV_PREFIX}/${multiple_images_url}" | \
-            xidel -q -e '<div class="item-container"><a href="{.}"></a></div>*' - | \
+            pup -p '.item-container > a attr{href}' | \
             while read line || [ -n "$line" ]; do
                 local image_download_url="$(curl -s -b "$COOKIE_FILE" -A "$USER_AGENT" \
                     -e "${PIXIV_PREFIX}/${multiple_images_url}" "${PIXIV_PREFIX}${line}" | \
-                    xidel -q -e '<img src="{.}">?' -)"
+                    pup -p 'img attr{src}')"
                 sub_msg "Get download url ${image_download_url}"
                 printf '%s %s\n' "$image_download_url" "${PIXIV_MEDIUM_PREFIX}${image_id}" >> "$URL_LIST"
             done

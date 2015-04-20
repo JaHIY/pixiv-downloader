@@ -1,4 +1,4 @@
-#!/bin/sh -
+l!/bin/sh -
 
 USER_AGENT='Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Firefox/23.0'
 PIXIV_PREFIX='http://www.pixiv.net'
@@ -138,7 +138,7 @@ main() {
         download_pixiv_url "$line"
     done
     msg 'Downloading...'
-    parallel --bar --colsep ' ' -q curl -s -O --retry 10 -b "$COOKIE_FILE" -A "$USER_AGENT" \
+    parallel --bar --colsep ' ' -q curl -s -O -C - --retry 10 -b "$COOKIE_FILE" -A "$USER_AGENT" \
         -e "{2}" "{1}" :::: "$URL_LIST"
     msg "Finished downloading: $(date)"
     clean_up_on_exit
